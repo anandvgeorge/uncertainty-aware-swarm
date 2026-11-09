@@ -40,9 +40,6 @@ Host repository:
 ```text
 uncertainty-aware-swarm/
 ├── docker/
-│   ├── builder/
-│   ├── autonomy/
-│   └── gazebo/
 ├── docs/
 ├── scripts/
 ├── src/
