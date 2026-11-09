@@ -1,0 +1,47 @@
+services:
+
+  builder:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.builder
+    network_mode: host
+    volumes:
+      - ./src:/workspace/ros2_ws/src
+      - ros_build:/workspace/ros2_ws/build
+      - ros_install:/workspace/ros2_ws/install
+      - ros_log:/workspace/ros2_ws/log
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-1}
+
+  autonomy:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.autonomy
+    network_mode: host
+    volumes:
+      - ros_install:/workspace/ros2_ws/install:ro
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-1}
+    depends_on:
+      - gazebo
+    command: ["sleep", "infinity"]
+
+  gazebo:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gazebo
+    network_mode: host
+    environment:
+      DISPLAY: ${DISPLAY}
+      XAUTHORITY: /tmp/.Xauthority
+      QT_X11_NO_MITSHM: "1"
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY}:/tmp/.Xauthority:ro
+    command: ["sleep", "infinity"]
+
+
+volumes:
+  ros_build:
+  ros_install:
+  ros_log:

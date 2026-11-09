@@ -33,6 +33,8 @@ The project investigates how localization uncertainty affects collision avoidanc
 
 Host environment: Ubuntu 22.04.
 
+The development environment is containerized. A ROS installation on the host is not required.
+
 ## 4. Repository Structure
 
 ```text
@@ -43,9 +45,12 @@ Host environment: Ubuntu 22.04.
 ├── docs/          # Architecture and documentation
 ├── scripts/       # Utility scripts
 ├── tests/         # Integration tests
+├── docker-compose.yml
 ├── README.md
 └── CONTRIBUTING.md
 ```
+
+The ROS 2 workspace is maintained inside the containers. The repository's `src/` directory is mounted into the workspace.
 
 ## 5. Development Roadmap
 
@@ -57,12 +62,48 @@ Host environment: Ubuntu 22.04.
 - Phase 5: Decentralized coordination.
 - Phase 6: Experiments and evaluation.
 
-## 6. Development
+See [docs/roadmap.md](docs/roadmap.md) for milestone details and progress.
+
+## 6. Development Environment
+
+The Docker environment consists of three services:
+
+- `builder`: ROS 2 development environment for compiling packages and running tests.
+- `autonomy`: Runtime environment for executing the compiled ROS 2 stack.
+- `gazebo`: Gazebo Harmonic environment.
+
+Build the images:
+
+```bash
+docker compose build
+```
+
+Start the containers:
+
+```bash
+docker compose up -d
+```
+
+Check their status:
+
+```bash
+docker compose ps
+```
+
+The builder workspace uses persistent Docker volumes for build artifacts. The autonomy container mounts the install volume read-only.
+
+See [docs/architecture/docker-architecture.md](docs/architecture/docker-architecture.md) for the architecture and environment details.
+
+## 7. Development Workflow
 
 The `dev` branch is the integration branch. All feature development should happen in dedicated branches and be merged through Pull Requests.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
-## 7. Project Status
+## 8. Project Status
 
-Currently in Phase 0: Development infrastructure and environment setup.
+The project is currently in Phase 0: Development Infrastructure.
+
+The M0.2 Docker environment has been implemented and validated. Documentation is being finalized before closing the milestone.
+
+Gazebo-ROS integration is planned as part of M0.4.
