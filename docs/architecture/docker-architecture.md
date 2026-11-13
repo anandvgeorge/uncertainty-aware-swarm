@@ -121,7 +121,8 @@ Docker Compose orchestrates the three services.
 - Mounts the install volume read-only.
 - Receives the same configurable `ROS_DOMAIN_ID`.
 - Depends on Gazebo starting and the builder completing successfully.
-- Uses `sleep infinity` as its default command to keep the container running.
+- Runs `docker/start-autonomy.sh`, which sources ROS and the workspace before starting `ros_gz_bridge`.
+- Mounts `config/` read-only at `/workspace/config` for bridge configuration.
 
 ### Gazebo
 
@@ -129,9 +130,9 @@ Docker Compose orchestrates the three services.
 - Uses host networking.
 - Receives the host `DISPLAY` and X11 authorization configuration.
 - Mounts the X11 socket and Xauthority file.
-- Uses `sleep infinity` as its default command to keep the container running.
+- Maps `/dev/dri` for GPU access and launches `gz sim -r empty.sdf`.
 
-The current Compose configuration prepares and starts the containers. It does not automatically launch Gazebo or the autonomy application.
+Compose starts Gazebo and the clock bridge automatically; robot applications will be added later.
 
 ### Named volumes
 
@@ -243,7 +244,16 @@ docker compose down -v
 
 ROS-Gazebo integration is not part of M0.2.
 
-The planned integration will use `ros_gz_bridge` to connect ROS 2 communication with Gazebo Transport. This work is assigned to M0.4: Gazebo Integration.
+`docker/start-autonomy.sh` loads `config/ros_gz_bridge.yaml` using the bridge's `config_file` parameter. The current mapping forwards `/clock` from Gazebo to ROS 2 (`GZ_TO_ROS`). Add further topic names, message types, and directions as YAML entries.
+
+After changing the YAML or startup script, restart autonomy; no image rebuild is needed:
+
+```bash
+docker compose restart autonomy
+docker compose exec autonomy bash -c 'source /opt/ros/jazzy/setup.bash && ros2 topic echo /clock'
+```
+
+Expect advancing timestamps while simulation is running. ROS nodes using simulation time must set `use_sim_time: true`.
 
 The intended architecture is:
 
@@ -258,7 +268,7 @@ Autonomy Container             Gazebo Container
           Shared Host Network
 ```
 
-This diagram represents the planned integration architecture, not a claim that the bridge is already configured in M0.2.
+The clock bridge is implemented; robot nodes and their topic bridges will be added in later milestones.
 
 ## 10. Design Principles
 

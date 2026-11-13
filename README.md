@@ -104,4 +104,4 @@ The M0.2 Docker environment has been implemented and validated. Documentation is
 
 M0.3 is complete: automatic workspace builds and ROS 2 CLI publisher/subscriber communication inside autonomy have been verified.
 
-Gazebo-ROS integration is planned as part of M0.4.
+M0.4 is complete: Gazebo startup, GUI access, and the automatic YAML-configured `/clock` bridge have been verified. See [Docker integration details](docs/architecture/docker-architecture.md#9-ros-gazebo-integration) for configuration and verification.
