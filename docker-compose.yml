@@ -10,8 +10,10 @@ services:
       - ros_build:/workspace/ros2_ws/build
       - ros_install:/workspace/ros2_ws/install
       - ros_log:/workspace/ros2_ws/log
+      - ./docker/build-workspace.sh:/usr/local/bin/build-workspace.sh:ro
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-1}
+    command: ["bash", "/usr/local/bin/build-workspace.sh"]
 
   autonomy:
     build:
@@ -23,7 +25,10 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-1}
     depends_on:
-      - gazebo
+      gazebo:
+        condition: service_started
+      builder:
+        condition: service_completed_successfully
     command: ["sleep", "infinity"]
 
   gazebo:

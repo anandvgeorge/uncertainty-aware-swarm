@@ -8,4 +8,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /workspace/ros2_ws
 
+RUN printf '%s\n' \
+    'source /opt/ros/jazzy/setup.bash' \
+    'if [ -f /workspace/ros2_ws/install/setup.bash ]; then' \
+    '    source /workspace/ros2_ws/install/setup.bash' \
+    'fi' \
+    >> /root/.bashrc
+
 CMD ["bash"]

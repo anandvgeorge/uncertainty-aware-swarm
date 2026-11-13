@@ -15,4 +15,11 @@ WORKDIR /workspace/ros2_ws
 
 RUN rosdep init || true
 
+RUN printf '%s\n' \
+    'source /opt/ros/jazzy/setup.bash' \
+    'if [ -f /workspace/ros2_ws/install/setup.bash ]; then' \
+    '    source /workspace/ros2_ws/install/setup.bash' \
+    'fi' \
+    >> /root/.bashrc
+
 CMD ["bash"]
