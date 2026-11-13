@@ -61,7 +61,13 @@ Initial package structure is deferred until packages are needed in a later miles
 
 ### M0.4: Gazebo Integration
 
+**Status: Complete.**
+
 Integrate ROS 2 with Gazebo Harmonic using the ROS-Gazebo integration stack.
+
+- Gazebo Harmonic installation, automatic world launch, and GUI access verified.
+- `/clock` communication verified manually; automatic bridge startup now uses `config/ros_gz_bridge.yaml`.
+- Automatic startup with the YAML configuration verified: `/clock` timestamps advance without manually starting the bridge.
 
 ### M0.5: Robot Description and Spawning
 
