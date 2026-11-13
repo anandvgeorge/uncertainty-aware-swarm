@@ -14,8 +14,12 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
     ros-jazzy-robot-state-publisher \
     ros-jazzy-ros-gz \
-    ros-jazzy-turtlebot3-description \
-    ros-jazzy-turtlebot3-gazebo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Nav2 baseline and its matching TurtleBot3 simulation assets.
+RUN apt-get update && apt-get install -y \
+    ros-jazzy-nav2-bringup \
+    ros-jazzy-nav2-minimal-tb3-sim \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/ros2_ws
