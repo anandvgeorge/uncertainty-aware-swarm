@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y \
     python3-colcon-common-extensions \
     python3-rosdep \
     python3-vcstool \
+    ros-jazzy-robot-state-publisher \
+    ros-jazzy-ros-gz \
+    ros-jazzy-turtlebot3-description \
+    ros-jazzy-turtlebot3-gazebo \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/ros2_ws

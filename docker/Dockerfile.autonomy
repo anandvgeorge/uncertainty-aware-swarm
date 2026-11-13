@@ -3,7 +3,10 @@ FROM ros:jazzy-ros-base
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
+    ros-jazzy-robot-state-publisher \
     ros-jazzy-ros-gz \
+    ros-jazzy-turtlebot3-description \
+    ros-jazzy-turtlebot3-gazebo \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/ros2_ws
