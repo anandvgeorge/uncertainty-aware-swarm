@@ -36,6 +36,8 @@ services:
       context: .
       dockerfile: docker/Dockerfile.gazebo
     network_mode: host
+    devices:
+      - /dev/dri:/dev/dri
     environment:
       DISPLAY: ${DISPLAY}
       XAUTHORITY: /tmp/.Xauthority
@@ -43,7 +45,7 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${XAUTHORITY}:/tmp/.Xauthority:ro
-    command: ["sleep", "infinity"]
+    command: ["gz", "sim", "-r", "empty.sdf"]
 
 
 volumes:

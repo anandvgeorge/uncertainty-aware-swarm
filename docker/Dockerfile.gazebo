@@ -3,13 +3,19 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     curl \
     lsb-release \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Gazebo Harmonic installation will be configured here.
+RUN curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
+        -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] https://packages.osrfoundation.org/gazebo/ubuntu-stable noble main" \
+        > /etc/apt/sources.list.d/gazebo-stable.list \
+    && apt-get update && apt-get install -y gz-harmonic \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
 
-CMD ["bash"]
+CMD ["gz", "sim", "-r", "empty.sdf"]
