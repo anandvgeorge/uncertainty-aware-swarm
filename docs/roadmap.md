@@ -52,7 +52,12 @@ ROS-Gazebo integration was removed from M0.2 and is addressed in M0.4.
 
 ### M0.3: ROS 2 Workspace
 
-Establish the ROS 2 workspace and initial package structure.
+**Status: Complete.**
+
+- Workspace setup: automatic empty-workspace build in Docker, with source mounted at `/workspace/ros2_ws/src` and build artifacts stored in Docker volumes.
+- Runtime verification: ROS 2 CLI publisher/subscriber communication verified inside autonomy, with automatic environment sourcing.
+
+Initial package structure is deferred until packages are needed in a later milestone.
 
 ### M0.4: Gazebo Integration
 
