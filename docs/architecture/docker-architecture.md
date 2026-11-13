@@ -92,13 +92,15 @@ Autonomy container
 Execute ROS 2 stack
 ```
 
-- The builder runs on demand.
-- Package builds are explicitly triggered.
+- On Compose startup, the builder runs `docker/build-workspace.sh` to execute `colcon build`, then exits.
+- Autonomy waits for the build to complete successfully before starting.
 - Colcon handles incremental builds.
 - The autonomy container executes the packages available in the install volume.
 - Source changes require rebuilding before the updated stack is executed.
 
 The existence of build artifacts alone is not considered proof that they are up to date.
+
+Interactive Bash shells in builder and autonomy source ROS 2 and the workspace overlay when available. Use plain `colcon build`: symlink installs may reference source/build paths unavailable in autonomy.
 
 ## 5. Docker Compose Configuration
 
@@ -118,7 +120,7 @@ Docker Compose orchestrates the three services.
 - Uses host networking.
 - Mounts the install volume read-only.
 - Receives the same configurable `ROS_DOMAIN_ID`.
-- Depends on the Gazebo service.
+- Depends on Gazebo starting and the builder completing successfully.
 - Uses `sleep infinity` as its default command to keep the container running.
 
 ### Gazebo
@@ -190,7 +192,7 @@ docker compose up -d
 Check service status:
 
 ```bash
-docker compose ps
+docker compose ps -a
 ```
 
 View service logs:
@@ -202,10 +204,26 @@ docker compose logs
 Open a shell in a service:
 
 ```bash
-docker compose exec builder bash
+docker compose run --rm builder bash
 docker compose exec autonomy bash
 docker compose exec gazebo bash
 ```
+
+Verify ROS 2 communication in two separate terminals:
+
+```bash
+# Terminal 1
+docker compose exec autonomy bash
+ros2 topic pub /test_topic std_msgs/msg/String "{data: 'hello'}" --rate 1
+```
+
+```bash
+# Terminal 2
+docker compose exec autonomy bash
+ros2 topic echo /test_topic std_msgs/msg/String
+```
+
+Expect repeated `hello` messages. The empty-workspace build and this communication check were verified for M0.3.
 
 Stop the services:
 

@@ -72,22 +72,18 @@ The Docker environment consists of three services:
 - `autonomy`: Runtime environment for executing the compiled ROS 2 stack.
 - `gazebo`: Gazebo Harmonic environment.
 
-Build the images:
+Build the images and start the environment:
 
 ```bash
-docker compose build
+docker compose up --build -d
 ```
 
-Start the containers:
-
-```bash
-docker compose up -d
-```
+The builder automatically builds the ROS workspace and exits successfully. Autonomy starts after the build succeeds.
 
 Check their status:
 
 ```bash
-docker compose ps
+docker compose ps -a
 ```
 
 The builder workspace uses persistent Docker volumes for build artifacts. The autonomy container mounts the install volume read-only.
@@ -105,5 +101,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 The project is currently in Phase 0: Development Infrastructure.
 
 The M0.2 Docker environment has been implemented and validated. Documentation is being finalized before closing the milestone.
+
+M0.3 is complete: automatic workspace builds and ROS 2 CLI publisher/subscriber communication inside autonomy have been verified.
 
 Gazebo-ROS integration is planned as part of M0.4.
