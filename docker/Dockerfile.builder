@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     python3-colcon-common-extensions \
     python3-rosdep \
     python3-vcstool \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
     ros-jazzy-robot-state-publisher \
     ros-jazzy-ros-gz \
     ros-jazzy-turtlebot3-description \
