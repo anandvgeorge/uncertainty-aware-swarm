@@ -268,13 +268,13 @@ Autonomy Container             Gazebo Container
           Shared Host Network
 ```
 
-Robot spawning, namespaced command/state bridges, and robot-state publishing are implemented. Ground-truth localization and Nav2 bringup are subsequent work.
+Robot spawning, command/state/sensor bridges, TF, ground-truth odometry, and map-free Nav2 bringup are implemented for one robot.
 
 ### Single-robot spawning
 
 `swarm_bringup` installs the official `turtlebot3_gazebo` model assets into the shared install volume. Gazebo mounts that volume read-only and uses `GZ_SIM_RESOURCE_PATH` to resolve the model's `model://` mesh URIs. Gazebo waits for the builder to finish before starting. The project-owned `worlds/empty.sdf` supplies physics, entity creation, scene broadcasting, the IMU system, and the Ogre2 sensor rendering system. It is installed into the shared volume alongside the launch files.
 
-Autonomy launches `single_robot.launch.py`. It passes the official `models/turtlebot3_burger/model.sdf` directly to `ros_gz_sim create` against world `empty`. The spawner waits for the world's creation service. The default entity is `robot1`, at `(0, 0, 0.01)` metres with zero yaw. The upstream bridge and robot-state publisher stay running after the spawner exits. The robot namespace defaults to its entity name, giving `/robot1/cmd_vel`, `/robot1/odom`, `/robot1/joint_states`, `/robot1/tf`, and `/robot1/tf_static`. TF frame IDs remain local names such as `odom` and `base_footprint`, with TF topics isolated per namespace.
+Autonomy launches `single_robot.launch.py`. It loads the official Burger SDF, redirects differential-drive odometry/TF to `/wheel_odom` and `/wheel_tf`, adds Gazebo's built-in `OdometryPublisher` system, and passes the resulting SDF string to `ros_gz_sim create` against world `empty`. The source model assets remain unchanged. The spawner waits for the world's creation service. The default entity is `robot1`, at `(0, 0, 0.01)` metres with zero yaw. The upstream bridge and robot-state publisher stay running after the spawner exits. The robot namespace defaults to its entity name, giving `/robot1/cmd_vel`, `/robot1/odom`, `/robot1/joint_states`, `/robot1/tf`, and `/robot1/tf_static`. TF frame IDs remain local names such as `odom` and `base_footprint`, with TF topics isolated per namespace.
 
 Start from the repository root with valid `DISPLAY` and `XAUTHORITY`:
 
@@ -309,9 +309,39 @@ docker compose exec autonomy bash -c 'source /opt/ros/jazzy/setup.bash && ros2 t
 docker compose exec autonomy bash -c 'source /opt/ros/jazzy/setup.bash && ros2 topic echo /robot1/joint_states --once'
 ```
 
-Odometry comes from the Gazebo differential-drive plugin. Ground-truth localization and Nav2 goal navigation remain pending. IMU and lidar world systems are enabled in the project-owned world.
+Navigation odometry and `odom → base_footprint` come from Gazebo's `OdometryPublisher`, configured in `config/ground_truth_odometry.sdf`. The differential-drive plugin retains wheel odometry on separate Gazebo topics. The upstream bridge forwards ground-truth `/odom` and `/tf` into the robot's ROS namespace. IMU and lidar world systems are enabled in the project-owned world.
 
 Validation: the workspace built successfully; Compose startup reported successful entity creation; Gazebo listed `ground_plane` and `robot1`; the robot settled near `(0, 0, 0.01)`; mesh files were present at the configured resource path; ROS received simulation clock messages. The command/state integration check moved the robot over 5 cm through `/robot1/cmd_vel`, received both wheel joint states and odometry plus wheel TF, verified one clock publisher, and stopped the robot with zero velocity. GUI appearance has not been visually inspected. The installed model emits SDF extension warnings for `gz_frame_id`; these did not prevent spawning.
+
+### Map-free Nav2 navigation
+
+`single_robot.launch.py` starts the stock Nav2 planner, controller, behavior server, BT navigator, and lifecycle manager under `/robot1`. The lifecycle manager activates the servers automatically as the simulation and TF become available. `config/nav2.yaml` configures NavFn planning and the Regulated Pure Pursuit controller for the Burger, with a 0.15 m robot radius and 0.15 m/s desired forward velocity.
+
+The global planning frame is `odom`, aligned with Gazebo world coordinates. The built-in ground-truth plugin publishes pose, body-frame velocity, and the sole Gazebo `/tf` odometry transform at 30 Hz with zero added noise. The ROS transform chain is `odom → base_footprint → base_link → sensor links`. Wheel joint measurements remain available separately.
+
+The global costmap is a fixed 20 × 20 m region with origin `(-10, -10)` and 0.05 m resolution. The local costmap is a 3 × 3 m rolling window. Both use lidar obstacle and inflation layers. Unobserved space is initialized as free, so this is a baseline for the empty world and sensor-visible obstacles. Goals and routes must fit inside the configured global costmap. Enlarging the world experiment requires adjusting these bounds. This configuration starts without a map server, AMCL, or a `map → odom` transform.
+
+Start with the existing Compose entry point, then send a goal through Nav2's action interface:
+
+```bash
+docker compose up --build -d
+docker compose exec autonomy bash
+```
+
+Inside the autonomy shell:
+
+```bash
+ros2 lifecycle get /robot1/bt_navigator
+ros2 action send_goal /robot1/navigate_to_pose nav2_msgs/action/NavigateToPose \
+  '{pose: {header: {frame_id: odom}, pose: {position: {x: 1.0, y: 0.5}, orientation: {w: 1.0}}}}' \
+  --feedback
+```
+
+Wait for lifecycle state `active` before sending a goal. Expect the action result to report `SUCCEEDED` with `error_code: 0`. Goal positions use metres in `odom`; orientation uses a quaternion. Applications can use a standard ROS 2 `NavigateToPose` action client to submit, monitor, and cancel goals.
+
+Direct `/robot1/cmd_vel` commands still use `TwistStamped`. Finish or cancel an active navigation action before taking direct velocity control so that the custom controller and Nav2 do not command the robot simultaneously.
+
+Fresh-start validation succeeded for the goal `(1.0, 0.5)` with final ground-truth position approximately `(0.954, 0.579)` and zero final velocity. Nav2 reported action status `SUCCEEDED` and `error_code: 0`. The physical Gazebo model pose matched the reported odometry. IMU, lidar, wheel states, and odometry continued throughout navigation, and the Gazebo `/odom` and `/tf` topics each had one publisher. A temporary box blocking the direct route was marked as occupied in both costmaps, and the CLI goal command succeeded around it. The box was removed after testing.
 
 ### Sensor streams
 
@@ -321,7 +351,7 @@ Validation: the workspace built successfully; Compose startup reported successfu
 | `/robot1/joint_states` | `sensor_msgs/msg/JointState` | Left/right wheel joint positions in radians and velocities in radians/second | Upstream plugin default |
 | `/robot1/scan` | `sensor_msgs/msg/LaserScan` | 360 lidar ranges in metres, frame `base_scan` | 5 Hz |
 
-Wheel joint states provide simulated encoder-style measurements. Encoder tick quantization is a separate model that has not been added. The differential-drive plugin supplies `/robot1/odom` alongside these readings. Message rates above use simulation time, so wall-clock rates depend on simulation performance.
+Wheel joint states provide simulated encoder-style measurements. Encoder tick quantization is a separate model that has not been added. Gazebo ground-truth odometry supplies `/robot1/odom` alongside these readings. Message rates above use simulation time, so wall-clock rates depend on simulation performance.
 
 The existing launch publishes an identity transform from `imu_link` to the Gazebo IMU message frame `<robot_name>/imu_link/tb3_imu` on the robot's `tf_static` topic. The upstream model and bridge configuration remain the source of the sensor data. This alias connects IMU measurements to the URDF transform tree.
 

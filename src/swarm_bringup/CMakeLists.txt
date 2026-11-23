@@ -20,6 +20,6 @@ install(DIRECTORY
   "${tb3_share}/models/turtlebot3_burger"
   "${tb3_share}/models/turtlebot3_common"
   DESTINATION share/${PROJECT_NAME}/simulation)
-install(DIRECTORY launch worlds DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY launch worlds config DESTINATION share/${PROJECT_NAME})
 
 ament_package()

@@ -97,7 +97,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 ## 8. Project Status
 
-The project is currently in Phase 0: Working Multi-Robot Nav2 Baseline. Infrastructure is established; robot navigation is not yet verified.
+The project is currently in Phase 0: Working Multi-Robot Nav2 Baseline. One TurtleBot3 Burger has verified map-free Nav2 goal navigation using Gazebo ground-truth odometry. Multi-robot navigation remains pending.
 
 The M0.2 Docker environment has been implemented and validated. Documentation is being finalized before closing the milestone.
 
@@ -111,4 +111,6 @@ The robot now exposes namespaced ROS command, odometry, joint-state, and TF inte
 
 IMU, wheel joint measurements, and lidar are enabled on `/robot1/imu`, `/robot1/joint_states`, and `/robot1/scan`. See [sensor streams](docs/architecture/docker-architecture.md#sensor-streams) for measurements and checks.
 
-Next: configure ground-truth localization and bring up stock Nav2. Verify that one robot reaches a goal before adding more robots.
+The existing bringup now starts Nav2 automatically. Goals use `/robot1/navigate_to_pose` (`nav2_msgs/action/NavigateToPose`) in frame `odom`. Gazebo ground truth supplies odometry and its TF. Global and local costmaps use lidar without a saved map. See [map-free navigation and goal commands](docs/architecture/docker-architecture.md#map-free-nav2-navigation).
+
+Next: extend the verified single-robot baseline to multiple independently navigating robots.

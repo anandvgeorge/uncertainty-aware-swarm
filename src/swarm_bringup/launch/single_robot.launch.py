@@ -1,28 +1,54 @@
 """Spawn one official TurtleBot3 Burger in the Gazebo server run by Compose."""
 
 import os
+import xml.etree.ElementTree as ET
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, GroupAction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.actions import Node
+from launch_ros.actions import Node, PushRosNamespace
+from launch_ros.descriptions import ParameterFile
+from nav2_common.launch import RewrittenYaml
 
 
 def generate_launch_description():
     simulation_share = get_package_share_directory('turtlebot3_gazebo')
-    # create sends this filename to the Gazebo server in the other container.
-    # Both containers can read the unchanged model from the shared install volume.
+    # Reuse the official model and add Gazebo's ground-truth odometry system.
     model = os.path.join(
         get_package_share_directory('swarm_bringup'),
         'simulation', 'turtlebot3_burger', 'model.sdf',
     )
+    bringup_share = get_package_share_directory('swarm_bringup')
+    sdf = ET.parse(model)
+    robot = sdf.getroot().find('model')
+    drive = robot.find("plugin[@name='gz::sim::systems::DiffDrive']")
+    # Keep wheel odometry separate from the ground-truth navigation source.
+    drive.find('odom_topic').text = '/wheel_odom'
+    drive.find('tf_topic').text = '/wheel_tf'
+    robot.append(ET.parse(os.path.join(
+        bringup_share, 'config', 'ground_truth_odometry.sdf',
+    )).getroot())
+    nav2_params = os.path.join(bringup_share, 'config', 'nav2.yaml')
+    navigation_nodes = [
+        ('nav2_controller', 'controller_server'),
+        ('nav2_planner', 'planner_server'),
+        ('nav2_behaviors', 'behavior_server'),
+        ('nav2_bt_navigator', 'bt_navigator'),
+    ]
     with open(os.path.join(
         simulation_share, 'urdf', 'turtlebot3_burger.urdf',
     ), encoding='utf-8') as description_file:
         robot_description = description_file.read()
 
     namespace = LaunchConfiguration('namespace')
+    configured_nav2_params = ParameterFile(RewrittenYaml(
+        source_file=nav2_params, root_key=namespace,
+        # Costmap nodes have their own subnamespace; both scan sources must
+        # subscribe to the robot's sensor topic rather than costmap/scan.
+        param_rewrites={'topic': PathJoinSubstitution(['/', namespace, 'scan'])},
+        convert_types=True,
+    ))
     return LaunchDescription([
         DeclareLaunchArgument('world', default_value='empty'),
         DeclareLaunchArgument('robot_name', default_value='robot1'),
@@ -70,9 +96,31 @@ def generate_launch_description():
             arguments=[
                 '-world', LaunchConfiguration('world'),
                 '-name', LaunchConfiguration('robot_name'),
-                '-allow_renaming', 'false', '-file', model,
+                '-allow_renaming', 'false',
+                '-string', ET.tostring(sdf.getroot(), encoding='unicode'),
                 '-x', LaunchConfiguration('x'), '-y', LaunchConfiguration('y'),
                 '-z', LaunchConfiguration('z'), '-Y', LaunchConfiguration('yaw'),
             ],
         ),
+        GroupAction([
+            PushRosNamespace(namespace),
+            *[
+                Node(
+                    package=package, executable=name, name=name,
+                    parameters=[configured_nav2_params, {'use_sim_time': True}],
+                    remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+                    output='screen',
+                )
+                for package, name in navigation_nodes
+            ],
+            Node(
+                package='nav2_lifecycle_manager', executable='lifecycle_manager',
+                name='lifecycle_manager_navigation',
+                parameters=[{
+                    'use_sim_time': True, 'autostart': True,
+                    'node_names': [name for _, name in navigation_nodes],
+                }],
+                output='screen',
+            ),
+        ]),
     ])
