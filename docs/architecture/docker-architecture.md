@@ -121,7 +121,7 @@ Docker Compose orchestrates the three services.
 - Mounts the install volume read-only.
 - Receives the same configurable `ROS_DOMAIN_ID`.
 - Depends on Gazebo starting and the builder completing successfully.
-- Runs `docker/start-autonomy.sh`, which sources ROS and the workspace before starting `ros_gz_bridge`.
+- Runs `docker/start-autonomy.sh`, which sources ROS and the workspace before launching `swarm_bringup swarm.launch.py` (one shared clock bridge and three robot/Nav2 instances).
 - Mounts `config/` read-only at `/workspace/config` for bridge configuration.
 
 ### Gazebo
@@ -130,9 +130,9 @@ Docker Compose orchestrates the three services.
 - Uses host networking.
 - Receives the host `DISPLAY` and X11 authorization configuration.
 - Mounts the X11 socket and Xauthority file.
-- Maps `/dev/dri` for GPU access and launches `gz sim -r empty.sdf`.
+- Maps `/dev/dri` for GPU access and launches the installed `swarm_bringup/worlds/empty.sdf`.
 
-Compose starts Gazebo and the clock bridge automatically; robot applications will be added later.
+Compose starts Gazebo, one clock bridge, and three TurtleBot3 Burgers named `robot1`, `robot2`, and `robot3` automatically.
 
 ### Named volumes
 
@@ -244,12 +244,13 @@ docker compose down -v
 
 ROS-Gazebo integration is not part of M0.2.
 
-`docker/start-autonomy.sh` loads `config/ros_gz_bridge.yaml` using the bridge's `config_file` parameter. The current mapping forwards `/clock` from Gazebo to ROS 2 (`GZ_TO_ROS`). Add further topic names, message types, and directions as YAML entries.
+`swarm.launch.py`, started by `docker/start-autonomy.sh`, includes `single_robot.launch.py` for each robot. The reusable robot launch reads the installed `turtlebot3_gazebo/params/turtlebot3_burger_bridge.yaml`, prefixes its mappings with the robot namespace, and starts the robot bridge using those topic arguments. Only the first instance starts the global `/clock` bridge. The earlier `config/ros_gz_bridge.yaml` clock-only configuration remains in the repository as the M0.4 baseline.
 
-After changing the YAML or startup script, restart autonomy; no image rebuild is needed:
+After changing the startup script, reset the runtime services for a fresh world:
 
 ```bash
-docker compose restart autonomy
+docker compose stop autonomy gazebo
+docker compose up -d
 docker compose exec autonomy bash -c 'source /opt/ros/jazzy/setup.bash && ros2 topic echo /clock'
 ```
 
@@ -268,7 +269,141 @@ Autonomy Container             Gazebo Container
           Shared Host Network
 ```
 
-The clock bridge is implemented; robot nodes and their topic bridges will be added in later milestones.
+Robot spawning, command/state/sensor bridges, TF, ground-truth odometry, and map-free Nav2 bringup are implemented independently for three robots.
+
+### Single-robot spawning
+
+`swarm_bringup` installs the official `turtlebot3_gazebo` model assets into the shared install volume. Gazebo mounts that volume read-only and uses `GZ_SIM_RESOURCE_PATH` to resolve the model's `model://` mesh URIs. Gazebo waits for the builder to finish before starting. The project-owned `worlds/empty.sdf` supplies physics, entity creation, scene broadcasting, the IMU system, and the Ogre2 sensor rendering system. It is installed into the shared volume alongside the launch files.
+
+`single_robot.launch.py` loads the official Burger SDF, redirects differential-drive odometry/TF to each robot's Gazebo `wheel_odom` and `wheel_tf` topics, adds Gazebo's built-in `OdometryPublisher` system, and passes the resulting SDF string to `ros_gz_sim create` against world `empty`. The source model assets remain unchanged. The spawner waits for the world's creation service. The default entity is `robot1`, at `(0, 0, 0.01)` metres with zero yaw. The robot bridge and robot-state publisher stay running after the spawner exits. The robot namespace defaults to its entity name, giving `/robot1/cmd_vel`, `/robot1/odom`, `/robot1/joint_states`, `/robot1/tf`, and `/robot1/tf_static`. TF frame IDs remain local names such as `odom` and `base_footprint`, with TF topics isolated per namespace.
+
+Start from the repository root with valid `DISPLAY` and `XAUTHORITY`:
+
+```bash
+docker compose up --build -d
+docker compose logs autonomy
+docker compose exec gazebo gz model --list
+docker compose exec gazebo gz model -m robot1 --pose
+docker compose exec autonomy bash -c 'source /opt/ros/jazzy/setup.bash && ros2 topic echo /clock'
+```
+
+Expect three successful entity creations, `robot1`, `robot2`, and `robot3` alongside `ground_plane`, and advancing clock timestamps. In the Gazebo GUI, select `robot1` in the entity tree and move the camera to it to inspect the robot at the origin.
+
+After editing package source, rebuild and reset both runtime services:
+
+```bash
+docker compose run --rm --no-deps builder
+docker compose stop autonomy gazebo
+docker compose up -d
+```
+
+The robot name is fixed and automatic renaming is disabled. Restarting only autonomy while the same Gazebo world is running attempts to spawn an existing name and is rejected; reset both runtime services as above for a fresh world. Docker volumes are retained.
+
+The reusable single-robot launch exposes `world`, `robot_name`, `namespace`, `start_clock_bridge`, `x`, `y`, `z`, and `yaw` arguments. Each model's IMU, lidar, command, joint-state, and odometry/TF topic names receive the robot namespace before spawning. The bridge applies the same namespace to the upstream YAML mappings. The official Burger URDF supplies robot-state publishing.
+
+The robot accepts `geometry_msgs/msg/TwistStamped` commands. Test at low speed while the simulation is running, then explicitly send zero velocity to stop:
+
+```bash
+docker compose exec autonomy bash -c 'source /opt/ros/jazzy/setup.bash && ros2 topic pub --once -w 1 /robot1/cmd_vel geometry_msgs/msg/TwistStamped "{twist: {linear: {x: 0.1}}}"'
+docker compose exec autonomy bash -c 'source /opt/ros/jazzy/setup.bash && ros2 topic echo /robot1/odom --once'
+docker compose exec autonomy bash -c 'source /opt/ros/jazzy/setup.bash && ros2 topic pub --once -w 1 /robot1/cmd_vel geometry_msgs/msg/TwistStamped "{twist: {linear: {x: 0.0}, angular: {z: 0.0}}}"'
+docker compose exec autonomy bash -c 'source /opt/ros/jazzy/setup.bash && ros2 topic echo /robot1/joint_states --once'
+```
+
+Navigation odometry and `odom → base_footprint` come from Gazebo's `OdometryPublisher`, configured in `config/ground_truth_odometry.sdf`. The differential-drive plugin retains wheel odometry on separate Gazebo topics. Each robot bridge forwards its Gazebo ground-truth odometry and TF into the same ROS namespace. IMU and lidar world systems are enabled in the project-owned world.
+
+Validation: the workspace built successfully; Compose startup reported successful entity creation; Gazebo listed `ground_plane` and `robot1`; the robot settled near `(0, 0, 0.01)`; mesh files were present at the configured resource path; ROS received simulation clock messages. The command/state integration check moved the robot over 5 cm through `/robot1/cmd_vel`, received both wheel joint states and odometry plus wheel TF, verified one clock publisher, and stopped the robot with zero velocity. GUI appearance has not been visually inspected. The installed model emits SDF extension warnings for `gz_frame_id`; these did not prevent spawning.
+
+### Three-robot bringup
+
+The existing Compose startup invokes `swarm.launch.py`, which reuses the single-robot launch three times. Default spawn poses are defined in that launch file:
+
+| Robot | Spawn XY (m) | Goal action |
+|---|---|---|
+| `robot1` | `(0, 0)` | `/robot1/navigate_to_pose` |
+| `robot2` | `(0, 2)` | `/robot2/navigate_to_pose` |
+| `robot3` | `(0, -2)` | `/robot3/navigate_to_pose` |
+
+All spawn at `z = 0.01` m with zero yaw. Each instance has its own Gazebo and ROS sensor/command/state topics, ground-truth publisher, robot-state publisher, IMU frame alias, costmaps, Nav2 servers, and lifecycle manager. TF frame IDs are local to each instance's `/<robot>/tf` and `/<robot>/tf_static` topics. Each `odom` coordinate system aligns with the same Gazebo world coordinates, so a goal at `(1.5, 2.0)` for `robot2` is a world position rather than an offset from its spawn point.
+
+One clock bridge is started by `robot1`; the other two instances set `start_clock_bridge:=false`. Isolated Gazebo topic names ensure that one robot's velocity commands cannot drive another robot.
+
+Inside the autonomy shell, submit separate goals:
+
+```bash
+ros2 action send_goal /robot1/navigate_to_pose nav2_msgs/action/NavigateToPose \
+  '{pose: {header: {frame_id: odom}, pose: {position: {x: 1.0, y: 0.5}, orientation: {w: 1.0}}}}'
+ros2 action send_goal /robot2/navigate_to_pose nav2_msgs/action/NavigateToPose \
+  '{pose: {header: {frame_id: odom}, pose: {position: {x: 1.5, y: 2.0}, orientation: {w: 1.0}}}}'
+ros2 action send_goal /robot3/navigate_to_pose nav2_msgs/action/NavigateToPose \
+  '{pose: {header: {frame_id: odom}, pose: {position: {x: 0.75, y: -2.5}, orientation: {w: 1.0}}}}'
+```
+
+These CLI commands wait for each result. Use separate terminals or asynchronous action clients for concurrent goals. After a fresh startup, three action clients submitted the above goals concurrently, and all three returned `SUCCEEDED` with `error_code: 0`.
+
+| Robot | Measured final XY (m) | Goal error (m) |
+|---|---|---|
+| `robot1` | `(0.9163, 0.4384)` | `0.1039` |
+| `robot2` | `(1.4037, 2.0000)` | `0.0963` |
+| `robot3` | `(0.6894, -2.4340)` | `0.0896` |
+
+For each robot, validation checked fresh IMU/lidar/wheel-state/odometry timestamps, 360 lidar samples, wheel positions and velocities, complete TF to the lidar and actual IMU message frame, active Nav2 lifecycle state, and one odometry/scan publisher per namespace. All robots stopped after their goals; `/clock` had exactly one publisher.
+
+### Map-free Nav2 navigation
+
+`single_robot.launch.py` starts the stock Nav2 planner, controller, behavior server, BT navigator, and lifecycle manager under each robot's namespace. The lifecycle manager activates the servers automatically as the simulation and TF become available. `config/nav2.yaml` configures NavFn planning and the Regulated Pure Pursuit controller for the Burger, with a 0.15 m robot radius and 0.15 m/s desired forward velocity.
+
+The global planning frame is `odom`, aligned with Gazebo world coordinates. The built-in ground-truth plugin publishes pose, body-frame velocity, and the sole Gazebo odometry transform on each robot's namespaced `tf` topic at 30 Hz with zero added noise. The ROS transform chain is `odom → base_footprint → base_link → sensor links`. Wheel joint measurements remain available separately.
+
+The global costmap is a fixed 20 × 20 m region with origin `(-10, -10)` and 0.05 m resolution. The local costmap is a 3 × 3 m rolling window. Both use lidar obstacle and inflation layers. Unobserved space is initialized as free, so this is a baseline for the empty world and sensor-visible obstacles. Goals and routes must fit inside the configured global costmap. Enlarging the world experiment requires adjusting these bounds. This configuration starts without a map server, AMCL, or a `map → odom` transform.
+
+Start with the existing Compose entry point, then send a goal through Nav2's action interface:
+
+```bash
+docker compose up --build -d
+docker compose exec autonomy bash
+```
+
+Inside the autonomy shell:
+
+```bash
+ros2 lifecycle get /robot1/bt_navigator
+ros2 action send_goal /robot1/navigate_to_pose nav2_msgs/action/NavigateToPose \
+  '{pose: {header: {frame_id: odom}, pose: {position: {x: 1.0, y: 0.5}, orientation: {w: 1.0}}}}' \
+  --feedback
+```
+
+Wait for lifecycle state `active` before sending a goal. Expect the action result to report `SUCCEEDED` with `error_code: 0`. Goal positions use metres in `odom`; orientation uses a quaternion. Applications can use a standard ROS 2 `NavigateToPose` action client to submit, monitor, and cancel goals.
+
+Direct `/robot1/cmd_vel` commands still use `TwistStamped`. Finish or cancel an active navigation action before taking direct velocity control so that the custom controller and Nav2 do not command the robot simultaneously.
+
+Fresh-start validation succeeded for the goal `(1.0, 0.5)` with final ground-truth position approximately `(0.954, 0.579)` and zero final velocity. Nav2 reported action status `SUCCEEDED` and `error_code: 0`. The physical Gazebo model pose matched the reported odometry. IMU, lidar, wheel states, and odometry continued throughout navigation, and each robot's Gazebo odometry and TF topic had one publisher. A temporary box blocking the direct route was marked as occupied in both costmaps, and the CLI goal command succeeded around it. The box was removed after testing.
+
+### Sensor streams
+
+The examples below use `robot1`; the same topics are available under `/robot2` and `/robot3`.
+
+| ROS topic | Message type | Measurements | Configured simulation rate |
+|---|---|---|---|
+| `/robot1/imu` | `sensor_msgs/msg/Imu` | Orientation, angular velocity, linear acceleration | 200 Hz |
+| `/robot1/joint_states` | `sensor_msgs/msg/JointState` | Left/right wheel joint positions in radians and velocities in radians/second | Upstream plugin default |
+| `/robot1/scan` | `sensor_msgs/msg/LaserScan` | 360 lidar ranges in metres, frame `base_scan` | 5 Hz |
+
+Wheel joint states provide simulated encoder-style measurements. Encoder tick quantization is a separate model that has not been added. Gazebo ground-truth odometry supplies `/robot1/odom` alongside these readings. Message rates above use simulation time, so wall-clock rates depend on simulation performance.
+
+The existing launch publishes an identity transform from `imu_link` to the Gazebo IMU message frame `<robot_name>/imu_link/tb3_imu` on the robot's `tf_static` topic. The upstream model and bridge configuration remain the source of the sensor data. This alias connects IMU measurements to the URDF transform tree.
+
+Check actual sensor messages from an autonomy shell:
+
+```bash
+ros2 topic echo /robot1/imu --once --qos-reliability best_effort
+ros2 topic echo /robot1/joint_states --once --qos-reliability best_effort
+ros2 topic echo /robot1/scan --once --qos-reliability best_effort
+```
+
+The IMU should measure approximately 9.8 m/s² acceleration magnitude at rest and respond to robot rotation. Wheel positions and velocities should respond to motion commands. In an empty scene, lidar may report infinite ranges for rays without returns, and finite ranges where rays meet the ground or robot geometry. Place an obstacle in Gazebo to inspect nearby returns.
+
+Sensor validation confirmed advancing timestamps on all three streams, both wheel position/velocity arrays, and IMU acceleration magnitude near gravity. A rotation command produced approximately 0.30 rad/s IMU yaw rate and changing wheel angles. A temporary target was used to check lidar distance, then removed. Gazebo may print the known `gz_frame_id` schema warnings while retaining the sensor frame tags.
 
 ## 10. Design Principles
 

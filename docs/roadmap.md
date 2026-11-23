@@ -1,8 +1,10 @@
 # Project Roadmap
 
-## Phase 0: Infrastructure
+## Phase 0: Working Multi-Robot Nav2 Baseline
 
-Establish a reproducible development environment and software engineering workflow.
+Build up to three independently navigating robots in one shared world using stock Nav2 and Gazebo ground-truth localization. Keep the existing Docker architecture; defer custom navigation algorithms.
+
+**Exit condition:** Three robots reach independent goals from a reproducible configuration. Validate each milestone before proceeding.
 
 ### M0.1: GitHub Repository Foundation
 
@@ -69,34 +71,45 @@ Integrate ROS 2 with Gazebo Harmonic using the ROS-Gazebo integration stack.
 - `/clock` communication verified manually; automatic bridge startup now uses `config/ros_gz_bridge.yaml`.
 - Automatic startup with the YAML configuration verified: `/clock` timestamps advance without manually starting the bridge.
 
-### M0.5: Robot Description and Spawning
+### M0.5: Multi-robot independent navigation with Nav2
 
-Create the robot description and establish repeatable robot spawning in simulation.
+**Status: Complete. Three robots reached independent goals after a fresh startup.**
+
+- Add TurtleBot/Nav2 dependencies, an empty world and ground-truth localization, and `swarm_bringup` for spawning, bridges, localization, and navigation in the existing Gazebo instance.
+- `swarm_bringup` builds, installs upstream TurtleBot3 assets, and automatically spawns `robot1`, `robot2`, and `robot3` in the existing Gazebo world.
+- Entity creation, settled pose, shared mesh availability, and ROS clock reception have been verified.
+- Namespaced command/state bridges and robot-state publishing are implemented and verified with ROS-commanded motion, odometry, wheel states, TF, and stopping.
+- IMU and lidar world systems are enabled, with IMU, wheel joint, and lidar data verified through ROS.
+- Gazebo ground-truth odometry and map-free Nav2 are implemented.
+- Gazebo and ROS command/state/sensor topics are isolated per robot, with separate TF trees, costmaps, Nav2 servers, and lifecycle managers. One `/clock` bridge is shared.
+- Verified concurrent `NavigateToPose` goals for `robot1`, `robot2`, and `robot3`. All returned `SUCCEEDED`.
+
+**Acceptance:** Establish a working multi-robot navigation baseline using Nav2.
 
 ### M0.6: Continuous Integration
 
 Establish automated build and test workflows.
 
-## Phase 1: Multi-Robot Navigation
-
-Establish a working multi-robot navigation baseline using Nav2.
-
-## Phase 2: Collision Avoidance
+## Phase 1: Collision Avoidance
 
 Implement and evaluate baseline collision-avoidance algorithms such as RVO and ORCA.
 
-## Phase 3: State Estimation
+Use interchangeable algorithm libraries independent of Nav2.
+
+## Phase 2: State Estimation
 
 Integrate EKF-based state estimation and validate covariance estimates against simulation ground truth.
 
-## Phase 4: Uncertainty-Aware Collision Avoidance
+## Phase 3: Uncertainty-Aware Collision Avoidance
 
 Develop collision-avoidance methods that explicitly account for state-estimation uncertainty.
 
-## Phase 5: Decentralized Coordination
+## Phase 4: Decentralized Coordination
 
 Implement decentralized robot-state exchange and coordination without a central decision-making node.
 
-## Phase 6: Experimental Evaluation
+Keep supervision limited to orchestration; add custom interfaces when needed.
+
+## Phase 5: Experimental Evaluation
 
 Benchmark the proposed methods under different localization uncertainties, robot densities, and communication conditions.

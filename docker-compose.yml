@@ -37,6 +37,9 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.gazebo
+    depends_on:
+      builder:
+        condition: service_completed_successfully
     network_mode: host
     devices:
       - /dev/dri:/dev/dri
@@ -44,10 +47,12 @@ services:
       DISPLAY: ${DISPLAY}
       XAUTHORITY: /tmp/.Xauthority
       QT_X11_NO_MITSHM: "1"
+      GZ_SIM_RESOURCE_PATH: /workspace/ros2_ws/install/swarm_bringup/share/swarm_bringup/simulation
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${XAUTHORITY}:/tmp/.Xauthority:ro
-    command: ["gz", "sim", "-r", "empty.sdf"]
+      - ros_install:/workspace/ros2_ws/install:ro
+    command: ["gz", "sim", "-r", "/workspace/ros2_ws/install/swarm_bringup/share/swarm_bringup/worlds/empty.sdf"]
 
 
 volumes:
