@@ -26,7 +26,7 @@ The project investigates how localization uncertainty affects collision avoidanc
 | Middleware | ROS 2 Jazzy |
 | Simulation | Gazebo Harmonic |
 | Navigation | Nav2 |
-| Localization / state estimation | AMCL baseline; EKF in a later phase |
+| Localization / state estimation | Gazebo ground-truth baseline; EKF in a later phase |
 | Language | C++17 |
 | Build system | CMake, colcon |
 | Testing | GoogleTest |
@@ -105,4 +105,10 @@ M0.3 is complete: automatic workspace builds and ROS 2 CLI publisher/subscriber 
 
 M0.4 is complete: Gazebo startup, GUI access, and the automatic YAML-configured `/clock` bridge have been verified. See [Docker integration details](docs/architecture/docker-architecture.md#9-ros-gazebo-integration) for configuration and verification.
 
-Next is M0.5: bring up one TurtleBot3 with stock Nav2 and verify that it reaches a navigation goal before adding more robots.
+M0.5 now spawns one TurtleBot3 Burger (`robot1`) automatically in Gazebo when the environment starts. The workspace build, entity creation, settled pose, mesh availability, and ROS clock reception have been verified; GUI appearance has not been visually inspected. See [single-robot startup and validation](docs/architecture/docker-architecture.md#single-robot-spawning).
+
+The robot now exposes namespaced ROS command, odometry, joint-state, and TF interfaces using the upstream TurtleBot3 bridge definitions and robot-state publisher. ROS-commanded motion, odometry, wheel joint states, TF, and stopping have been verified.
+
+IMU, wheel joint measurements, and lidar are enabled on `/robot1/imu`, `/robot1/joint_states`, and `/robot1/scan`. See [sensor streams](docs/architecture/docker-architecture.md#sensor-streams) for measurements and checks.
+
+Next: configure ground-truth localization and bring up stock Nav2. Verify that one robot reaches a goal before adding more robots.

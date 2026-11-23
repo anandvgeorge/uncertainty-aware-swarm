@@ -16,10 +16,11 @@ RUN apt-get update && apt-get install -y \
     ros-jazzy-ros-gz \
     && rm -rf /var/lib/apt/lists/*
 
-# Nav2 baseline and its matching TurtleBot3 simulation assets.
+# Official TurtleBot3 Burger simulation assets and the Nav2 baseline.
 RUN apt-get update && apt-get install -y \
     ros-jazzy-nav2-bringup \
-    ros-jazzy-nav2-minimal-tb3-sim \
+    ros-jazzy-turtlebot3-gazebo \
+    ros-jazzy-turtlebot3-description \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/ros2_ws

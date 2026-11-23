@@ -2,7 +2,7 @@
 
 ## Phase 0: Working Multi-Robot Nav2 Baseline
 
-Build up to three independently navigating robots in one shared world using stock Nav2 and AMCL. Keep the existing Docker architecture; defer custom navigation algorithms.
+Build up to three independently navigating robots in one shared world using stock Nav2 and Gazebo ground-truth localization. Keep the existing Docker architecture; defer custom navigation algorithms.
 
 **Exit condition:** Three robots reach independent goals from a reproducible configuration. Validate each milestone before proceeding.
 
@@ -73,9 +73,11 @@ Integrate ROS 2 with Gazebo Harmonic using the ROS-Gazebo integration stack.
 
 ### M0.5: Multi-robot independent navigation with Nav2
 
-**Status: Preparation started; navigation unverified.**
+**Status: Single-robot spawning validated; navigation unverified.**
 
-Add TurtleBot/Nav2 dependencies, a matching world/map, and `swarm_bringup` for spawning, bridges, localization, and navigation in the existing Gazebo instance.
+Add TurtleBot/Nav2 dependencies, an empty world and ground-truth localization, and `swarm_bringup` for spawning, bridges, localization, and navigation in the existing Gazebo instance.
+
+Single-robot spawning checkpoint: `swarm_bringup` builds, installs upstream TurtleBot3 assets, and automatically spawns `robot1` in the existing Gazebo world. Entity creation, settled pose, shared mesh availability, and ROS clock reception have been verified. GUI appearance has not been visually inspected. Namespaced command/state bridges and robot-state publishing are implemented and verified with ROS-commanded motion, odometry, wheel states, TF, and stopping. IMU and lidar world systems are enabled, with IMU, wheel joint, and lidar data verified through ROS. Ground-truth localization and Nav2 goal completion remain pending.
 
 **Acceptance:** Establish a working multi-robot navigation baseline using Nav2.
 

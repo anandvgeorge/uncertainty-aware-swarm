@@ -6,6 +6,5 @@ if [ -f /workspace/ros2_ws/install/setup.bash ]; then
     source /workspace/ros2_ws/install/setup.bash
 fi
 
-# start ros_gz_bridge
-exec ros2 run ros_gz_bridge parameter_bridge \
-    --ros-args -p config_file:=/workspace/config/ros_gz_bridge.yaml
+# Spawn one official TurtleBot3 Burger and start its ROS interfaces.
+exec ros2 launch swarm_bringup single_robot.launch.py
