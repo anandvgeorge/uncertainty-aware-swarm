@@ -97,7 +97,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 ## 8. Project Status
 
-The project is currently in Phase 0: Working Multi-Robot Nav2 Baseline. One TurtleBot3 Burger has verified map-free Nav2 goal navigation using Gazebo ground-truth odometry. Multi-robot navigation remains pending.
+The project is currently in Phase 0: Working Multi-Robot Nav2 Baseline. Three TurtleBot3 Burgers have verified independent map-free Nav2 goal navigation using Gazebo ground-truth odometry.
 
 The M0.2 Docker environment has been implemented and validated. Documentation is being finalized before closing the milestone.
 
@@ -105,12 +105,14 @@ M0.3 is complete: automatic workspace builds and ROS 2 CLI publisher/subscriber 
 
 M0.4 is complete: Gazebo startup, GUI access, and the automatic YAML-configured `/clock` bridge have been verified. See [Docker integration details](docs/architecture/docker-architecture.md#9-ros-gazebo-integration) for configuration and verification.
 
-M0.5 now spawns one TurtleBot3 Burger (`robot1`) automatically in Gazebo when the environment starts. The workspace build, entity creation, settled pose, mesh availability, and ROS clock reception have been verified; GUI appearance has not been visually inspected. See [single-robot startup and validation](docs/architecture/docker-architecture.md#single-robot-spawning).
+M0.5 now spawns three TurtleBot3 Burgers (`robot1`, `robot2`, and `robot3`) automatically in the shared Gazebo world when the environment starts. The workspace build, entity creation, settled pose, mesh availability, and ROS clock reception have been verified; GUI appearance has not been visually inspected. See [three-robot startup and validation](docs/architecture/docker-architecture.md#three-robot-bringup).
 
-The robot now exposes namespaced ROS command, odometry, joint-state, and TF interfaces using the upstream TurtleBot3 bridge definitions and robot-state publisher. ROS-commanded motion, odometry, wheel joint states, TF, and stopping have been verified.
+Each robot exposes namespaced ROS command, odometry, joint-state, and TF interfaces using the upstream TurtleBot3 bridge definitions and robot-state publisher. ROS-commanded motion, odometry, wheel joint states, TF, and stopping have been verified.
 
 IMU, wheel joint measurements, and lidar are enabled on `/robot1/imu`, `/robot1/joint_states`, and `/robot1/scan`. See [sensor streams](docs/architecture/docker-architecture.md#sensor-streams) for measurements and checks.
 
-The existing bringup now starts Nav2 automatically. Goals use `/robot1/navigate_to_pose` (`nav2_msgs/action/NavigateToPose`) in frame `odom`. Gazebo ground truth supplies odometry and its TF. Global and local costmaps use lidar without a saved map. See [map-free navigation and goal commands](docs/architecture/docker-architecture.md#map-free-nav2-navigation).
+The existing bringup now starts Nav2 automatically. Goals use `/<robot_name>/navigate_to_pose` (`nav2_msgs/action/NavigateToPose`) in frame `odom`. Gazebo ground truth supplies odometry and its TF. Global and local costmaps use lidar without a saved map. See [map-free navigation and goal commands](docs/architecture/docker-architecture.md#map-free-nav2-navigation).
 
-Next: extend the verified single-robot baseline to multiple independently navigating robots.
+Three separate goals were accepted concurrently and completed successfully after a fresh startup. Each robot retained fresh sensors, odometry, commands, and TF, with one shared `/clock` publisher.
+
+Next: automated build/test workflows and collision-avoidance experiments.
