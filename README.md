@@ -95,11 +95,11 @@ The `dev` branch is the integration branch. All feature development should happe
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
-GitHub Actions runs build checks on pull requests and pushes to `dev`, and can
+GitHub Actions runs build and configuration checks on pull requests and pushes to `dev`, and can
 also be started manually. It builds all three Docker images, builds the ROS
 workspace in a fresh container without development volumes, and verifies the
 installed `swarm_bringup` resources and TurtleBot3 assets. Build logs are uploaded
-even when a check fails. Configuration checks and simulation smoke tests are pending.
+even when a check fails. Simulation smoke tests are pending.
 
 To run the same build checks locally with Docker:
 
@@ -110,6 +110,22 @@ bash scripts/ci-build.sh /tmp/swarm-ci-build-logs
 Use a fresh log directory for each run. The script removes its temporary container
 and image tags on exit; Docker build cache is retained. No GUI or running simulation
 is required.
+
+The separate configuration job checks Python syntax, YAML (including duplicate
+keys), XML/SDF, three unique robot declarations and spawn positions, the shared
+clock bridge configuration, and Nav2/ground-truth frame consistency. It also
+resolves Docker Compose and checks Dockerfile and repository bind-mount paths.
+Run it locally with Python 3.10+, PyYAML (`python3-yaml` on Ubuntu), and Docker Compose:
+
+```bash
+python3 scripts/ci-check-config.py
+```
+
+These checks need no Docker daemon, ROS installation, or display. Desktop values
+are supplied only for Compose interpolation; the checks do not validate host GUI
+devices. The robot declaration check expects the literal `robots` list in
+`swarm.launch.py`. Runtime bridge mappings, namespace isolation, and the future
+headless CI Compose configuration will be verified with the simulation smoke test.
 
 ## 8. Project Status
 

@@ -91,7 +91,8 @@ Integrate ROS 2 with Gazebo Harmonic using the ROS-Gazebo integration stack.
 Establish automated build and test workflows.
 
 - Build checks implemented: GitHub Actions builds all three Docker images and a fresh ROS workspace, verifies installed package resources and TurtleBot3 assets, and retains build logs.
-- Configuration checks and simulation smoke tests remain to be implemented.
+- Configuration checks implemented: Python/YAML/XML syntax, duplicate YAML keys, robot declarations and spawn positions, shared clock mapping, Nav2/odometry frame consistency, and resolved Compose paths.
+- Simulation smoke tests and their headless Compose configuration remain to be implemented.
 
 ## Phase 1: Collision Avoidance
 
