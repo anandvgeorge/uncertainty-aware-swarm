@@ -95,6 +95,22 @@ The `dev` branch is the integration branch. All feature development should happe
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
+GitHub Actions runs build checks on pull requests and pushes to `dev`, and can
+also be started manually. It builds all three Docker images, builds the ROS
+workspace in a fresh container without development volumes, and verifies the
+installed `swarm_bringup` resources and TurtleBot3 assets. Build logs are uploaded
+even when a check fails. Configuration checks and simulation smoke tests are pending.
+
+To run the same build checks locally with Docker:
+
+```bash
+bash scripts/ci-build.sh /tmp/swarm-ci-build-logs
+```
+
+Use a fresh log directory for each run. The script removes its temporary container
+and image tags on exit; Docker build cache is retained. No GUI or running simulation
+is required.
+
 ## 8. Project Status
 
 The project is currently in Phase 0: Working Multi-Robot Nav2 Baseline. Three TurtleBot3 Burgers have verified independent map-free Nav2 goal navigation using Gazebo ground-truth odometry.
