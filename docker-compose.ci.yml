@@ -2,12 +2,14 @@
 # Each smoke run uses its own project network, volumes and Gazebo partition.
 services:
   builder:
+    image: ${SWARM_CI_IMAGE_PREFIX:-swarm-ci}-builder:latest
     network_mode: !reset null
     environment:
       ROS_DOMAIN_ID: "42"
       GZ_PARTITION: ${COMPOSE_PROJECT_NAME}
 
   autonomy:
+    image: ${SWARM_CI_IMAGE_PREFIX:-swarm-ci}-autonomy:latest
     network_mode: !reset null
     environment:
       ROS_DOMAIN_ID: "42"
@@ -16,6 +18,7 @@ services:
       - ./scripts/ci-smoke-test.py:/ci/smoke-test.py:ro
 
   gazebo:
+    image: ${SWARM_CI_IMAGE_PREFIX:-swarm-ci}-gazebo:latest
     network_mode: !reset null
     devices: !reset []
     environment: !override

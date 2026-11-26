@@ -7,6 +7,13 @@ mkdir -p "$log_dir"
 log_dir=$(cd -- "$log_dir" && pwd)
 COMPOSE_PROJECT_NAME="swarm-ci-smoke-$(date +%s)-$$"
 export COMPOSE_PROJECT_NAME
+reuse_images=false
+if [[ -n ${SWARM_CI_IMAGE_PREFIX:-} ]]; then
+    reuse_images=true
+else
+    SWARM_CI_IMAGE_PREFIX=$COMPOSE_PROJECT_NAME
+fi
+export SWARM_CI_IMAGE_PREFIX
 # Base-file interpolation happens before the CI override removes GUI mounts.
 export DISPLAY=:0 XAUTHORITY=/tmp/swarm-ci.Xauthority
 compose=(docker compose --project-directory "$repo_root"
@@ -19,10 +26,16 @@ cleanup() {
     timeout --kill-after=5s 15s "${compose[@]}" logs --no-color >"$log_dir/containers.log" 2>&1 || true
     timeout --kill-after=5s 15s "${compose[@]}" ps -a >"$log_dir/services.log" 2>&1 || true
     timeout --kill-after=5s 15s "${compose[@]}" cp builder:/workspace/ros2_ws/log "$log_dir/colcon" >/dev/null 2>&1 || true
-    if ! timeout --kill-after=5s 60s "${compose[@]}" down --timeout 10 --volumes --remove-orphans --rmi local \
+    if ! timeout --kill-after=5s 60s "${compose[@]}" down --timeout 10 --volumes --remove-orphans \
         >"$log_dir/cleanup.log" 2>&1; then
         echo "FAIL: cleanup did not finish; see $log_dir/cleanup.log (project $COMPOSE_PROJECT_NAME)"
         status=1
+    fi
+    if [[ $reuse_images == false ]]; then
+        for service in builder autonomy gazebo; do
+            timeout --kill-after=5s 10s docker image rm "$SWARM_CI_IMAGE_PREFIX-$service:latest" \
+                >>"$log_dir/cleanup.log" 2>&1 || true
+        done
     fi
     echo "Smoke test finished with exit status $status. Logs: $log_dir"
     exit "$status"
@@ -33,8 +46,14 @@ trap 'exit 143' TERM
 
 echo "Smoke-test logs: $log_dir"
 "${compose[@]}" config >"$log_dir/compose.yml"
-"${compose[@]}" build 2>&1 | tee "$log_dir/images.log"
-timeout --kill-after=5s 180s "${compose[@]}" up -d 2>&1 | tee "$log_dir/startup.log"
+if [[ $reuse_images == true ]]; then
+    for service in builder autonomy gazebo; do
+        docker image inspect "$SWARM_CI_IMAGE_PREFIX-$service:latest" >>"$log_dir/images.log"
+    done
+else
+    "${compose[@]}" build 2>&1 | tee "$log_dir/images.log"
+fi
+timeout --kill-after=5s 180s "${compose[@]}" up -d --no-build --pull never 2>&1 | tee "$log_dir/startup.log"
 
 # Run the ROS observer while monitoring container health. Its wall-clock
 # deadline still expires if simulation time stalls or never starts.

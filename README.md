@@ -100,7 +100,13 @@ also be started manually. It builds all three Docker images, builds the ROS
 workspace in a fresh container without development volumes, and verifies the
 installed `swarm_bringup` resources and TurtleBot3 assets. Build logs are uploaded
 even when a check fails. After configuration and build checks pass, the same runner
-executes the headless simulation smoke test, reusing Docker build cache.
+executes the headless simulation smoke test. Docker Buildx restores and exports
+GitHub Actions layer caches with separate scopes for builder, autonomy and Gazebo.
+The first run populates these caches; subsequent runs reuse unchanged layers.
+Both test scripts reuse the images loaded by the workflow without rebuilding or
+pulling them. Workspace build/install artifacts remain fresh on every run.
+Image build logs are available in the Docker action steps; workspace and smoke
+logs are uploaded as artifacts.
 
 To run the same build checks locally with Docker:
 
@@ -111,6 +117,12 @@ bash scripts/ci-build.sh /tmp/swarm-ci-build-logs
 Use a fresh log directory for each run. The script removes its temporary container
 and image tags on exit; Docker build cache is retained. No GUI or running simulation
 is required.
+
+For an existing set of images named `<prefix>-builder:latest`,
+`<prefix>-autonomy:latest` and `<prefix>-gazebo:latest`, set
+`SWARM_CI_IMAGE_PREFIX=<prefix>` when running either script to skip image builds.
+Missing images fail the check. Supplied images are preserved during cleanup;
+default local runs still build and remove their own temporary image tags.
 
 The separate configuration job checks Python syntax, YAML (including duplicate
 keys), XML/SDF, three unique robot declarations and spawn positions, the shared
