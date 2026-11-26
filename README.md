@@ -95,11 +95,12 @@ The `dev` branch is the integration branch. All feature development should happe
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
-GitHub Actions runs build and configuration checks on pull requests and pushes to `dev`, and can
+GitHub Actions runs build, configuration and simulation checks on pull requests and pushes to `dev`, and can
 also be started manually. It builds all three Docker images, builds the ROS
 workspace in a fresh container without development volumes, and verifies the
 installed `swarm_bringup` resources and TurtleBot3 assets. Build logs are uploaded
-even when a check fails. Simulation smoke tests are pending.
+even when a check fails. After configuration and build checks pass, the same runner
+executes the headless simulation smoke test, reusing Docker build cache.
 
 To run the same build checks locally with Docker:
 
@@ -115,7 +116,7 @@ The separate configuration job checks Python syntax, YAML (including duplicate
 keys), XML/SDF, three unique robot declarations and spawn positions, the shared
 clock bridge configuration, and Nav2/ground-truth frame consistency. It also
 resolves Docker Compose and checks Dockerfile and repository bind-mount paths.
-Run it locally with Python 3.10+, PyYAML (`python3-yaml` on Ubuntu), and Docker Compose:
+Run it locally with Python 3.10+, PyYAML (`python3-yaml` on Ubuntu), and Docker Compose 2.24.4+:
 
 ```bash
 python3 scripts/ci-check-config.py
@@ -124,8 +125,29 @@ python3 scripts/ci-check-config.py
 These checks need no Docker daemon, ROS installation, or display. Desktop values
 are supplied only for Compose interpolation; the checks do not validate host GUI
 devices. The robot declaration check expects the literal `robots` list in
-`swarm.launch.py`. Runtime bridge mappings, namespace isolation, and the future
-headless CI Compose configuration will be verified with the simulation smoke test.
+`swarm.launch.py`. The merged headless Compose configuration is also checked for
+missing mounts, host-network use, and GUI/GPU requirements.
+
+Run the simulation smoke test with Docker and Compose 2.24.4+:
+
+```bash
+bash scripts/ci-smoke.sh "$(mktemp -d /tmp/swarm-ci-smoke-XXXXXX)"
+```
+
+The CI Compose override runs Gazebo with EGL software rendering, without a display
+or GPU device. Each run builds a fresh workspace in its own volumes and uses its
+own Docker network and Gazebo partition. The observer requires advancing clock,
+odometry, IMU, lidar and joint-state timestamps; valid per-robot transforms; active
+Nav2 servers; and available navigation action servers. It checks publisher and
+subscriber namespaces and compares odometry/TF positions with the distinct spawn
+positions, then confirms all three entities in the Gazebo scene. Readiness must
+remain satisfied for five seconds within a 180-second wall-clock deadline.
+
+This is a startup/readiness test; it does not send motion commands or navigation
+goals. It monitors Gazebo/autonomy container liveness and preserves container,
+workspace, observer and scene logs. The script removes its containers, volumes,
+network and temporary image tags on exit. GitHub retains the logs for seven days,
+including on failure.
 
 ## 8. Project Status
 
@@ -147,4 +169,6 @@ The existing bringup now starts Nav2 automatically. Goals use `/<robot_name>/nav
 
 Three separate goals were accepted concurrently and completed successfully after a fresh startup. Each robot retained fresh sensors, odometry, commands, and TF, with one shared `/clock` publisher.
 
-Next: automated build/test workflows and collision-avoidance experiments.
+M0.6 build, configuration and headless simulation checks are implemented and have
+passed locally. GitHub-hosted execution remains to be verified through the PR.
+Next: collision-avoidance experiments.

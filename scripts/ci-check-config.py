@@ -36,6 +36,19 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def compose_value(loader, node):
+    # Compose handles merge semantics; this pass only parses tagged values.
+    if isinstance(node, yaml.SequenceNode):
+        return loader.construct_sequence(node)
+    if isinstance(node, yaml.MappingNode):
+        return loader.construct_mapping(node)
+    return loader.construct_scalar(node)
+
+
+for tag in ('!reset', '!override'):
+    UniqueKeyLoader.add_constructor(tag, compose_value)
+
+
 def check_repository(root):
     yaml_paths = sorted(
         path for directory in (root / 'src', root / 'config', root / '.github')
@@ -127,6 +140,28 @@ def check_repository(root):
                 if source.is_relative_to(root):
                     require(source.exists(), f'{name}: missing repository mount {source}')
     print('PASS resolved Compose configuration, Dockerfiles and repository mounts')
+
+    result = subprocess.run(
+        ['docker', 'compose', '--project-directory', str(root),
+         '-f', str(root / 'docker-compose.yml'), '-f', str(root / 'docker-compose.ci.yml'),
+         'config', '--format', 'json'],
+        env=env, check=True, capture_output=True, text=True,
+    )
+    ci = json.loads(result.stdout)
+    gazebo = ci['services']['gazebo']
+    require(not gazebo.get('devices'), 'CI must not require host GPU devices')
+    require('DISPLAY' not in gazebo['environment'], 'CI must not require a display')
+    require('--headless-rendering' in gazebo['command'] and '-s' in gazebo['command'],
+            'CI must run the Gazebo server with headless rendering')
+    require(all(volume['type'] == 'volume' for volume in gazebo['volumes']),
+            'CI Gazebo must not mount host GUI paths')
+    for service in ci['services'].values():
+        require(service.get('network_mode') != 'host', 'CI must use an isolated network')
+        for volume in service.get('volumes', []):
+            if volume['type'] == 'bind':
+                require(Path(volume['source']).exists(),
+                        f"Missing CI mount: {volume['source']}")
+    print('PASS headless CI Compose override and isolated network')
 
 
 if __name__ == '__main__':

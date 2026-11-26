@@ -30,7 +30,8 @@ jobs:
         run: python3 scripts/ci-check-config.py
 
   build:
-    name: Docker and ROS workspace build
+    name: Build and simulation smoke test
+    needs: config
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -41,11 +42,24 @@ jobs:
       - name: Build images and verify installed workspace
         run: bash scripts/ci-build.sh "$RUNNER_TEMP/ci-build-logs"
 
+      - name: Run headless three-robot smoke test
+        timeout-minutes: 10
+        run: bash scripts/ci-smoke.sh "$RUNNER_TEMP/ci-smoke-logs"
+
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: build-logs
           path: ${{ runner.temp }}/ci-build-logs
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload simulation logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: smoke-test-logs
+          path: ${{ runner.temp }}/ci-smoke-logs
           if-no-files-found: warn
           retention-days: 7

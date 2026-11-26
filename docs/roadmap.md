@@ -92,7 +92,8 @@ Establish automated build and test workflows.
 
 - Build checks implemented: GitHub Actions builds all three Docker images and a fresh ROS workspace, verifies installed package resources and TurtleBot3 assets, and retains build logs.
 - Configuration checks implemented: Python/YAML/XML syntax, duplicate YAML keys, robot declarations and spawn positions, shared clock mapping, Nav2/odometry frame consistency, and resolved Compose paths.
-- Simulation smoke tests and their headless Compose configuration remain to be implemented.
+- Simulation smoke test implemented: isolated headless Gazebo with software rendering; three entities; advancing clock and sensor data; per-robot TF and spawn positions; active Nav2 lifecycle nodes and available action servers; container liveness, deadlines, retained logs and cleanup.
+- All checks passed locally. GitHub-hosted workflow execution remains to be verified through the PR. Navigation-goal regression testing is outside this milestone's smoke-test scope.
 
 ## Phase 1: Collision Avoidance
 

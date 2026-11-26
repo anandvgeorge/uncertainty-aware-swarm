@@ -1,0 +1,34 @@
+# Requires Docker Compose >= 2.24.4. Merge after docker-compose.yml.
+# Each smoke run uses its own project network, volumes and Gazebo partition.
+services:
+  builder:
+    network_mode: !reset null
+    environment:
+      ROS_DOMAIN_ID: "42"
+      GZ_PARTITION: ${COMPOSE_PROJECT_NAME}
+
+  autonomy:
+    network_mode: !reset null
+    environment:
+      ROS_DOMAIN_ID: "42"
+      GZ_PARTITION: ${COMPOSE_PROJECT_NAME}
+    volumes:
+      - ./scripts/ci-smoke-test.py:/ci/smoke-test.py:ro
+
+  gazebo:
+    network_mode: !reset null
+    devices: !reset []
+    environment: !override
+      GZ_PARTITION: ${COMPOSE_PROJECT_NAME}
+      GZ_SIM_RESOURCE_PATH: /workspace/ros2_ws/install/swarm_bringup/share/swarm_bringup/simulation
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      EGL_PLATFORM: surfaceless
+    volumes: !override
+      - ros_install:/workspace/ros2_ws/install:ro
+    command:
+      - gz
+      - sim
+      - -s
+      - -r
+      - --headless-rendering
+      - /workspace/ros2_ws/install/swarm_bringup/share/swarm_bringup/worlds/empty.sdf
