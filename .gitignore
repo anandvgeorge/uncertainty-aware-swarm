@@ -1,0 +1,27 @@
+# ROS 2 / Colcon
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Build
+*.o
+*.so
+*.a
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp

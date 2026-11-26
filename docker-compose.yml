@@ -1,0 +1,61 @@
+services:
+
+  builder:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.builder
+    network_mode: host
+    volumes:
+      - ./src:/workspace/ros2_ws/src
+      - ros_build:/workspace/ros2_ws/build
+      - ros_install:/workspace/ros2_ws/install
+      - ros_log:/workspace/ros2_ws/log
+      - ./docker/build-workspace.sh:/usr/local/bin/build-workspace.sh:ro
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-1}
+    command: ["bash", "/usr/local/bin/build-workspace.sh"]
+
+  autonomy:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.autonomy
+    network_mode: host
+    volumes:
+      - ros_install:/workspace/ros2_ws/install:ro
+      - ./docker/start-autonomy.sh:/usr/local/bin/start-autonomy.sh:ro
+      - ./config:/workspace/config:ro
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-1}
+    depends_on:
+      gazebo:
+        condition: service_started
+      builder:
+        condition: service_completed_successfully
+    command: ["bash", "/usr/local/bin/start-autonomy.sh"]
+
+  gazebo:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gazebo
+    depends_on:
+      builder:
+        condition: service_completed_successfully
+    network_mode: host
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      DISPLAY: ${DISPLAY}
+      XAUTHORITY: /tmp/.Xauthority
+      QT_X11_NO_MITSHM: "1"
+      GZ_SIM_RESOURCE_PATH: /workspace/ros2_ws/install/swarm_bringup/share/swarm_bringup/simulation
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY}:/tmp/.Xauthority:ro
+      - ros_install:/workspace/ros2_ws/install:ro
+    command: ["gz", "sim", "-r", "/workspace/ros2_ws/install/swarm_bringup/share/swarm_bringup/worlds/empty.sdf"]
+
+
+volumes:
+  ros_build:
+  ros_install:
+  ros_log:
